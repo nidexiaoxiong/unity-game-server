@@ -1,29 +1,18 @@
 import asyncio
 import websockets
-import signal
+import os
 
-async def handler(websocket):
-    print("Unity客户端已连接")
-    try:
-        async for msg in websocket:
-            print(f"收到Unity发来消息: {msg}")
-            if msg == "start":
-                await websocket.send("move_right")
-            elif msg == "stop":
-                await websocket.send("stop")
-            else:
-                await websocket.send("move_left")
-    finally:
-        print("客户端断开连接")
+PORT = int(os.environ.get("PORT", 10000))
+
+async def handle_client(websocket):
+    print("客户端连接成功")
+    async for msg in websocket:
+        print(f"收到消息: {msg}")
+        await websocket.send(f"服务器收到：{msg}")
 
 async def main():
-    stop = asyncio.get_running_loop().create_future()
-    async def on_shutdown():
-        stop.set_result(None)
-    signal.signal(signal.SIGTERM, lambda *_: asyncio.create_task(on_shutdown()))
-
-    async with websockets.serve(handler, "0.0.0.0", 8080):
-        await stop
+    async with websockets.serve(handle_client, "0.0.0.0", PORT):
+        await asyncio.Future()
 
 if __name__ == "__main__":
     asyncio.run(main())
