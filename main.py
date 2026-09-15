@@ -11,7 +11,6 @@ async def handle_client(websocket):
     try:
         async for msg in websocket:
             print(f"收到消息: {msg}")
-            # 广播给所有连接（Unity + 网页客户端）
             for conn in connected_clients:
                 if conn.open:
                     await conn.send(f"服务器收到: {msg}")
