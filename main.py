@@ -96,7 +96,7 @@ async def handle_client(websocket):
             print(f"收到消息: {msg}")
             for conn in connected_clients:
                 if conn.open:
-                    await conn.send(`服务器收到: ${msg}`)
+                    await conn.send(f"服务器收到: {msg}")
     finally:
         connected_clients.remove(websocket)
         print("客户端断开，在线数量：", len(connected_clients))
