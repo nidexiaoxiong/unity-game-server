@@ -1,9 +1,8 @@
-import asyncio
-import websockets
-import os
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.responses import HTMLResponse
+import uvicorn
 
-PORT = int(os.environ.get("PORT", 10000))
-connected_clients = set()
+app = FastAPI()
 
 HTML_PAGE = """<!DOCTYPE html>
 <html lang="ja">
@@ -49,33 +48,29 @@ function addLog(text){
 </html>
 """
 
-async def process_request(path, request_headers):
-    if path == "/":
-        return 200, {"Content-Type": "text/html; charset=utf-8"}, HTML_PAGE.encode("utf-8")
-    return None
+active_connections: set[WebSocket] = set()
 
-async def handle_client(websocket):
-    connected_clients.add(websocket)
-    print("新客户端连接成功，当前在线数量：", len(connected_clients))
+@app.get("/", response_class=HTMLResponse)
+async def get_index():
+    return HTML_PAGE
+
+@app.websocket("/")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    active_connections.add(websocket)
+    print("新客户端连接，在线数量：", len(active_connections))
     try:
-        async for msg in websocket:
-            print(f"收到消息: {msg}")
-            for conn in connected_clients:
-                if conn.open:
-                    await conn.send(f"服务器收到: {msg}")
-    finally:
-        connected_clients.remove(websocket)
-        print("客户端断开连接，在线数量：", len(connected_clients))
-
-async def main():
-    async with websockets.serve(
-        handle_client,
-        "0.0.0.0",
-        PORT,
-        process_request=process_request,
-        origins=None
-    ):
-        await asyncio.Future()
+        while True:
+            data = await websocket.receive_text()
+            print(f"收到消息: {data}")
+            # 广播给所有客户端(Unity + 浏览器)
+            for conn in active_connections:
+                await conn.send_text(f"服务器收到: {data}")
+    except WebSocketDisconnect:
+        active_connections.remove(websocket)
+        print("客户端断开，在线数量：", len(active_connections))
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    import os
+    port = int(os.environ.get("PORT", 10000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port)
